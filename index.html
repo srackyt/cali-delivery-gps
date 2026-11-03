@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cali Delivery GPS - v7.1 Professional Edition</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <!-- Leaflet JS & Heatmap -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+    <style>
+        #map { width: 100%; height: 100%; z-index: 1; }
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background: #0f172a !important;
+            color: #f8fafc !important;
+            border: 1px solid #1e293b;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7);
+            border-radius: 1rem;
+        }
+        .leaflet-popup-content { margin: 14px 18px; line-height: 1.5; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #090d16; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        .pulse-marker {
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 50%; color: white; font-weight: bold; animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.7); }
+            70% { box-shadow: 0 0 0 14px rgba(249, 115, 22, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); }
+        }
+        .marker-icon-wrapper {
+            width: 42px; height: 42px; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; border: 2.5px solid white;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.5); font-size: 16px;
+        }
+        .night-mode-map { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+    </style>
+</head>
+<body class="bg-[#070a14] text-slate-100 font-sans h-screen flex flex-col overflow-hidden select-none">
+
+    <!-- Header Profesional & Limpio con Logo -->
+    <header class="bg-[#0b101d] border-b border-slate-800/80 px-4 py-3 flex items-center justify-between z-20 shadow-xl shrink-0 flex-wrap gap-3">
+        
+        <!-- Logo y Título -->
+        <div class="flex items-center space-x-3.5">
+            <!-- LOGO OFICIAL ACTUALIZADO A logo.png -->
+            <div class="w-14 h-14 rounded-2xl overflow-hidden shadow-xl shadow-orange-500/20 border-2 border-orange-500/50 bg-slate-950 flex items-center justify-center shrink-0 p-0.5">
+                <img src="logo.png" alt="Cali Delivery GPS Logo" class="w-full h-full object-contain">
+            </div>
+            <div>
+                <h1 class="font-black text-base md:text-lg leading-tight flex items-center gap-2 tracking-wide">
+                    CALI DELIVERY <span class="text-orange-500">GPS</span>
+                    <span class="text-[10px] bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 px-2 py-0.5 rounded-md font-mono font-bold shadow">PRO</span>
+                </h1>
+                <p class="text-[11px] text-slate-400 font-medium">Red Vial Colaborativa & Logística Urbana</p>
+            </div>
+        </div>
+
+        <!-- Grupo de Acciones Superiores con Botones Diferenciados -->
+        <div class="flex items-center gap-2.5 flex-wrap">
+            
+            <!-- 1. Widget Pico y Placa -->
+            <div class="hidden xl:flex items-center gap-2.5 bg-gradient-to-r from-amber-500/10 to-amber-600/5 border border-amber-500/30 px-3.5 py-2 rounded-2xl text-xs text-amber-200 shadow-inner">
+                <div class="w-7 h-7 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400 font-bold shrink-0">
+                    <i class="fa-solid fa-calendar-days"></i>
+                </div>
+                <div>
+                    <span class="block text-[9px] uppercase font-bold text-amber-400/90 tracking-wider">Pico y Placa Cali</span>
+                    <span id="pico-placa-digits" class="font-bold text-slate-200 text-[11px]">Cargando...</span>
+                </div>
+            </div>
+
+            <!-- 2. Botón Ganancias -->
+            <button id="btn-earnings-trigger" class="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white px-4 py-2 rounded-2xl font-bold text-xs flex items-center gap-2 transition shadow-lg shadow-emerald-600/20 hover:scale-105 border border-emerald-500/40">
+                <div class="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center text-white">
+                    <i class="fa-solid fa-wallet text-xs"></i>
+                </div>
+                <div class="text-left leading-tight">
+                    <span class="block text-[9px] text-emerald-200 uppercase tracking-wider">Ganancias</span>
+                    <span id="header-earnings-val" class="font-extrabold text-xs">$ 0 COP</span>
+                </div>
+            </button>
+
+            <!-- 3. Botón Emergencias -->
+            <button id="btn-contacts-trigger" class="bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/80 px-3.5 py-2 rounded-2xl text-xs flex items-center gap-2 transition hover:scale-105 shadow-md" title="Teléfonos Emergencia Cali">
+                <div class="w-6 h-6 rounded-lg bg-rose-500/20 flex items-center justify-center text-rose-400">
+                    <i class="fa-solid fa-phone-volume text-xs"></i>
+                </div>
+                <span class="font-semibold hidden sm:inline">Emergencias</span>
+            </button>
+
+            <!-- 4. Botón Pánico S.O.S -->
+            <button id="btn-sos-trigger" class="bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-600 text-white font-black px-4 py-2 rounded-2xl shadow-lg shadow-rose-600/40 flex items-center gap-2 text-xs transition animate-pulse border border-rose-400 hover:scale-105">
+                <div class="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center text-white">
+                    <i class="fa-solid fa-triangle-exclamation text-xs"></i>
+                </div>
+                <span>S.O.S</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Banner Flotante de Alerta GPS -->
+    <div id="proximity-alert-banner" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-[1000] bg-gradient-to-r from-rose-950 to-red-950 border-2 border-rose-500 text-rose-100 px-5 py-3.5 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-3.5 animate-bounce max-w-md">
+        <div class="w-10 h-10 rounded-xl bg-rose-500/30 border border-rose-400 flex items-center justify-center text-rose-300 shrink-0">
+            <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+        </div>
+        <div class="text-xs">
+            <p class="font-black uppercase tracking-wider text-rose-300">¡Alerta de Proximidad GPS!</p>
+            <p id="proximity-alert-text" class="text-rose-100 font-medium">Evento reportado a menos de 300 metros.</p>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="flex-1 flex flex-col md:flex-row relative overflow-hidden">
+
+        <!-- Sidebar / Panel Central Interactivo -->
+        <aside id="sidebar" class="w-full md:w-[410px] bg-[#0b101d] border-r border-slate-800/80 flex flex-col z-10 shrink-0 h-1/2 md:h-full transition-all duration-300 shadow-2xl">
+            
+            <!-- WIDGET DE CLIMA POR ZONAS EN CALI -->
+            <div class="bg-[#050811] px-4 py-2.5 border-b border-slate-800/80 flex items-center justify-between text-[11px]">
+                <span class="font-bold text-slate-400 flex items-center gap-2"><i class="fa-solid fa-cloud-sun-rain text-sky-400 text-sm"></i> Microclima Cali:</span>
+                <div class="flex gap-2 text-[10px]" id="weather-widget">
+                    <span class="text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded-xl border border-amber-500/20 font-medium">Norte: ☀️ Seco</span>
+                    <span class="text-sky-300 bg-sky-500/10 px-2.5 py-1 rounded-xl border border-sky-500/20 font-medium">Sur: 🌧️ Lluvia</span>
+                    <span class="text-slate-300 bg-slate-800/80 px-2.5 py-1 rounded-xl font-medium">Centro: ⛅ Nublado</span>
+                </div>
+            </div>
+
+            <div class="p-4 border-b border-slate-800/80 space-y-3.5 bg-[#0b101d]/95 backdrop-blur">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-extrabold text-xs text-slate-200 tracking-wider uppercase flex items-center gap-2">
+                        <i class="fa-solid fa-comments text-orange-500 text-sm"></i> Novedades Viales ( <span id="active-count" class="text-orange-400 font-mono">0</span> )
+                    </h2>
+                    <div class="flex items-center gap-2">
+                        <button id="btn-demo-data" title="Cargar Datos Demo Cali" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-xl border border-slate-700 flex items-center gap-1.5 transition font-semibold">
+                            <i class="fa-solid fa-database text-amber-400"></i> Demo
+                        </button>
+                        <button id="btn-reset-data" title="Reiniciar Reportes" class="text-xs bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-300 px-3 py-1.5 rounded-xl border border-slate-700 hover:border-rose-900 flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filtros de Categoría -->
+                <div class="flex gap-1.5 overflow-x-auto pb-1.5 text-xs no-scrollbar" id="category-filter-bar">
+                    <button data-cat="all" class="cat-filter active bg-gradient-to-r from-orange-600 to-amber-600 text-white px-3.5 py-1.5 rounded-xl whitespace-nowrap font-bold transition shadow-md shadow-orange-600/20">Todas</button>
+                    <button data-cat="trafico" class="cat-filter bg-slate-800/80 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-xl whitespace-nowrap transition font-medium">Tráfico</button>
+                    <button data-cat="accidente" class="cat-filter bg-slate-800/80 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-xl whitespace-nowrap transition font-medium">Accidentes</button>
+                    <button data-cat="obras" class="cat-filter bg-slate-800/80 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-xl whitespace-nowrap transition font-medium">Vía Cerrada</button>
+                    <button data-cat="seguridad" class="cat-filter bg-slate-800/80 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-xl whitespace-nowrap transition font-medium">Riesgo</button>
+                    <button data-cat="clima" class="cat-filter bg-slate-800/80 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-xl whitespace-nowrap transition font-medium">Clima</button>
+                </div>
+
+                <!-- Buscador Interno -->
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+                    <input type="text" id="search-input" placeholder="Buscar en novedades, lugares o repartidores..." class="w-full bg-[#050811] border border-slate-800 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-orange-500 transition shadow-inner">
+                </div>
+            </div>
+
+            <!-- Lista de Feed -->
+            <div id="reports-feed" class="flex-1 overflow-y-auto p-3.5 space-y-3.5"></div>
+
+            <!-- Botón Publicar Inferior -->
+            <div class="p-3.5 border-t border-slate-800/80 bg-[#0b101d]">
+                <button id="btn-open-report-modal" class="w-full bg-gradient-to-r from-orange-600 via-amber-600 to-orange-500 hover:from-orange-500 hover:to-amber-500 text-white font-extrabold py-3.5 px-4 rounded-2xl shadow-xl shadow-orange-600/30 flex items-center justify-center gap-2.5 text-xs transition transform active:scale-95 uppercase tracking-wider border border-orange-400/30">
+                    <i class="fa-solid fa-circle-plus text-base"></i> Publicar Nueva Novedad
+                </button>
+            </div>
+        </aside>
+
+        <!-- Map Container -->
+        <main class="flex-1 relative h-1/2 md:h-full">
+            
+            <!-- Buscador de Direcciones Superior Mapa -->
+            <div class="absolute top-4 left-4 right-16 md:left-4 md:right-auto md:w-[400px] z-[500]">
+                <div class="relative flex items-center bg-[#0b101d]/95 border border-slate-700/80 shadow-2xl rounded-2xl backdrop-blur-md overflow-hidden p-1">
+                    <div class="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center text-orange-400 ml-1.5">
+                        <i class="fa-solid fa-location-crosshairs text-sm"></i>
+                    </div>
+                    <input type="text" id="address-search-input" placeholder="Buscar dirección en Cali (Ej. Calle 5 # 80)..." class="w-full bg-transparent px-3 py-2.5 text-xs text-slate-100 placeholder-slate-400 focus:outline-none font-medium">
+                    <button id="btn-address-search" class="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                </div>
+                <div id="search-results-dropdown" class="mt-2 bg-[#0b101d] border border-slate-800 rounded-2xl shadow-2xl max-h-52 overflow-y-auto hidden text-xs"></div>
+            </div>
+
+            <!-- Panel Flotante de Métricas y Tarifas de Ruta -->
+            <div id="route-fare-panel" class="hidden absolute top-20 left-4 z-[450] bg-[#0b101d]/95 border border-slate-700/80 p-4 rounded-3xl shadow-2xl backdrop-blur-md text-xs space-y-3 w-80">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span class="font-extrabold text-slate-200 flex items-center gap-2"><i class="fa-solid fa-route text-orange-400 text-sm"></i> Métricas de Ruta & Tarifa</span>
+                    <button id="btn-close-fare-panel" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-sm"></i></button>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-center">
+                    <div class="bg-[#050811] p-3 rounded-2xl border border-slate-800/80 shadow-inner">
+                        <span class="block text-[10px] text-slate-400 font-semibold">Distancia Real</span>
+                        <span id="route-dist-val" class="font-black text-orange-400 text-base">0.0 km</span>
+                    </div>
+                    <div class="bg-[#050811] p-3 rounded-2xl border border-slate-800/80 shadow-inner">
+                        <span class="block text-[10px] text-slate-400 font-semibold">Tiempo Estimado</span>
+                        <span id="route-time-val" class="font-black text-amber-400 text-base">0 min</span>
+                    </div>
+                </div>
+                <div class="bg-[#050811] p-3 rounded-2xl border border-slate-800/80 flex items-center justify-between shadow-inner">
+                    <div>
+                        <span class="block text-[10px] text-slate-400 font-semibold">Tarifa Sugerida Domicilio</span>
+                        <span class="text-[9px] text-slate-500 font-mono">Base $4.000 + $1.200/km</span>
+                    </div>
+                    <span id="route-fare-val" class="font-black text-emerald-400 text-lg">$ 0 COP</span>
+                </div>
+            </div>
+
+            <!-- Control de Capas Viales Elegante -->
+            <div class="absolute top-20 right-4 z-[400] bg-[#0b101d]/95 border border-slate-700/80 p-3.5 rounded-3xl shadow-2xl backdrop-blur-md space-y-2.5 text-xs w-52">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span class="font-bold text-slate-300 text-[11px] flex items-center gap-2">
+                        <i class="fa-solid fa-layer-group text-orange-500"></i> Capas Viales
+                    </span>
+                    <button id="btn-toggle-night-mode" title="Modo Nocturno Night Rider" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-400 flex items-center justify-center transition shadow">
+                        <i class="fa-solid fa-moon text-xs"></i>
+                    </button>
+                </div>
+                <label class="flex items-center gap-2.5 text-slate-200 cursor-pointer p-1.5 rounded-xl hover:bg-slate-800/50 transition">
+                    <input type="checkbox" id="layer-mio" checked class="rounded accent-blue-500 w-4 h-4">
+                    <span class="flex items-center gap-2 font-medium"><i class="fa-solid fa-bus text-blue-400 w-4 text-center"></i> Rutas MIO</span>
+                </label>
+                <label class="flex items-center gap-2.5 text-slate-200 cursor-pointer p-1.5 rounded-xl hover:bg-slate-800/50 transition">
+                    <input type="checkbox" id="layer-ciclo" checked class="rounded accent-emerald-500 w-4 h-4">
+                    <span class="flex items-center gap-2 font-medium"><i class="fa-solid fa-bicycle text-emerald-400 w-4 text-center"></i> Ciclovías</span>
+                </label>
+                <label class="flex items-center gap-2.5 text-slate-200 cursor-pointer p-1.5 rounded-xl hover:bg-slate-800/50 transition">
+                    <input type="checkbox" id="layer-puntos" checked class="rounded accent-emerald-500 w-4 h-4">
+                    <span class="flex items-center gap-2 font-medium text-emerald-300"><i class="fa-solid fa-store text-emerald-400 w-4 text-center"></i> Puntos Amigos</span>
+                </label>
+                <label class="flex items-center gap-2.5 text-slate-200 cursor-pointer p-1.5 rounded-xl hover:bg-slate-800/50 transition pt-1.5 border-t border-slate-800">
+                    <input type="checkbox" id="layer-heatmap" class="rounded accent-rose-500 w-4 h-4">
+                    <span class="flex items-center gap-2 font-bold text-rose-400"><i class="fa-solid fa-fire text-rose-500 w-4 text-center"></i> Mapa Calor</span>
+                </label>
+            </div>
+
+            <div id="map"></div>
+
+            <!-- Botón GPS Inferior -->
+            <div class="absolute bottom-6 right-6 z-[400]">
+                <button id="btn-my-location" class="bg-[#0b101d]/95 backdrop-blur-md border border-slate-700/80 text-slate-200 hover:text-white px-4 py-3 rounded-2xl shadow-2xl hover:bg-slate-800 transition flex items-center gap-2.5 text-xs font-bold hover:scale-105">
+                    <div class="w-7 h-7 rounded-xl bg-orange-500/20 flex items-center justify-center text-orange-400">
+                        <i class="fa-solid fa-location-arrow text-xs"></i>
+                    </div>
+                    <span>Mi Ubicación GPS</span>
+                </button>
+            </div>
+
+            <!-- Hint de Mapa -->
+            <div id="map-hint" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-[400] bg-[#0b101d]/95 border border-slate-700/80 backdrop-blur-md px-5 py-2.5 rounded-full shadow-2xl text-xs text-slate-300 flex items-center gap-2.5 pointer-events-none transition-all duration-300 font-medium">
+                <span class="w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping"></span>
+                <span>Haz clic en cualquier vía de Cali para publicar una novedad</span>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL: GANANCIAS -->
+    <div id="modal-earnings" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 hidden">
+        <div class="bg-[#0b101d] border border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-wallet"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-sm text-slate-100">Contabilidad de Domicilios</h3>
+                        <p class="text-[11px] text-slate-400">Control de ingresos y servicios del día</p>
+                    </div>
+                </div>
+                <button id="btn-close-earnings" class="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800/50"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 text-center">
+                <div class="bg-[#050811] p-4 rounded-2xl border border-slate-800 shadow-inner">
+                    <span class="block text-[10px] text-slate-400 uppercase font-bold tracking-wider">Total Ganado Hoy</span>
+                    <span id="total-earnings-display" class="font-black text-emerald-400 text-xl mt-1 block">$ 0 COP</span>
+                </div>
+                <div class="bg-[#050811] p-4 rounded-2xl border border-slate-800 shadow-inner">
+                    <span class="block text-[10px] text-slate-400 uppercase font-bold tracking-wider">Servicios Hechos</span>
+                    <span id="total-deliveries-count" class="font-black text-slate-200 text-xl mt-1 block">0</span>
+                </div>
+            </div>
+
+            <form id="form-add-delivery" class="space-y-3.5 pt-2 border-t border-slate-800 text-xs">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">Valor Cobrado ($)</label>
+                        <input type="number" id="input-delivery-fare" required min="1000" placeholder="Ej. 6500" class="w-full bg-[#050811] border border-slate-800 rounded-2xl p-3 text-slate-200 focus:outline-none focus:border-emerald-500 font-medium">
+                    </div>
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">Propina ($)</label>
+                        <input type="number" id="input-delivery-tip" placeholder="Ej. 2000" class="w-full bg-[#050811] border border-slate-800 rounded-2xl p-3 text-slate-200 focus:outline-none focus:border-emerald-500 font-medium">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Cliente / Referencia</label>
+                    <input type="text" id="input-delivery-client" placeholder="Ej. Entrega San Fernando" class="w-full bg-[#050811] border border-slate-800 rounded-2xl p-3 text-slate-200 focus:outline-none focus:border-emerald-500 font-medium">
+                </div>
+                <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold py-3.5 rounded-2xl shadow-xl shadow-emerald-600/30 uppercase tracking-wider transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-circle-plus"></i> Registrar Servicio
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: CONTACTOS DE EMERGENCIA -->
+    <div id="modal-contacts" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 hidden">
+        <div class="bg-[#0b101d] border border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="font-extrabold text-sm text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-phone-volume text-rose-500"></i> Teléfonos de Emergencia en Cali
+                </h3>
+                <button id="btn-close-contacts" class="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800/50"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="space-y-2.5 text-xs">
+                <a href="tel:123" class="flex items-center justify-between bg-[#050811] p-4 rounded-2xl border border-slate-800 hover:border-slate-700 transition shadow-inner">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </div>
+                        <div>
+                            <p class="font-bold text-slate-200 text-sm">Policía Nacional / Cuadrante</p>
+                            <p class="text-[10px] text-slate-400">Atención de emergencias 24 horas</p>
+                        </div>
+                    </div>
+                    <span class="bg-rose-600/20 text-rose-400 px-3.5 py-1.5 rounded-xl font-mono font-black text-sm">123</span>
+                </a>
+                <a href="tel:127" class="flex items-center justify-between bg-[#050811] p-4 rounded-2xl border border-slate-800 hover:border-slate-700 transition shadow-inner">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-car-burst"></i>
+                        </div>
+                        <div>
+                            <p class="font-bold text-slate-200 text-sm">Tránsito de Cali (Movilidad)</p>
+                            <p class="text-[10px] text-slate-400">Reporte de choques e inmovilizaciones</p>
+                        </div>
+                    </div>
+                    <span class="bg-amber-600/20 text-amber-400 px-3.5 py-1.5 rounded-xl font-mono font-black text-sm">127</span>
+                </a>
+                <a href="tel:119" class="flex items-center justify-between bg-[#050811] p-4 rounded-2xl border border-slate-800 hover:border-slate-700 transition shadow-inner">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-fire-extinguisher"></i>
+                        </div>
+                        <div>
+                            <p class="font-bold text-slate-200 text-sm">Bomberos de Cali</p>
+                            <p class="text-[10px] text-slate-400">Rescate y derrames en vía</p>
+                        </div>
+                    </div>
+                    <span class="bg-sky-600/20 text-sky-400 px-3.5 py-1.5 rounded-xl font-mono font-black text-sm">119</span>
+                </a>
+                <a href="tel:132" class="flex items-center justify-between bg-[#050811] p-4 rounded-2xl border border-slate-800 hover:border-slate-700 transition shadow-inner">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-kit-medical"></i>
+                        </div>
+                        <div>
+                            <p class="font-bold text-slate-200 text-sm">Cruz Roja Valle</p>
+                            <p class="text-[10px] text-slate-400">Atención médica y ambulancias</p>
+                        </div>
+                    </div>
+                    <span class="bg-emerald-600/20 text-emerald-400 px-3.5 py-1.5 rounded-xl font-mono font-black text-sm">132</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: S.O.S -->
+    <div id="modal-sos" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 hidden">
+        <div class="bg-[#0b101d] border-2 border-rose-600 rounded-3xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div class="flex items-center gap-3.5 border-b border-slate-800 pb-4">
+                <div class="p-3.5 bg-rose-600/20 border border-rose-500 text-rose-500 rounded-2xl">
+                    <i class="fa-solid fa-triangle-exclamation text-2xl"></i>
+                </div>
+                <div>
+                    <h3 class="font-black text-sm text-rose-400 tracking-wider">EMERGENCIA / BOTÓN S.O.S</h3>
+                    <p class="text-[11px] text-slate-400">Solicita ayuda a la comunidad de domiciliarios</p>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-300">Tipo de Auxilio Requerido:</label>
+                <select id="sos-type" class="w-full bg-[#050811] border border-slate-800 rounded-2xl p-3 text-xs text-slate-200 focus:outline-none focus:border-rose-500 font-medium">
+                    <option value="falla">🔧 Falla Mecánica / Despinche</option>
+                    <option value="accidente">🚑 Accidente de Tránsito</option>
+                    <option value="seguridad">🚨 Riesgo de Hurto / Inseguridad</option>
+                    <option value="medico">🩺 Emergencia Médica</option>
+                </select>
+            </div>
+
+            <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-300">Detalles adicionales:</label>
+                <textarea id="sos-desc" rows="2" placeholder="Ej. Pinchado en la Calle 5 con 80, necesito bomba o parche..." class="w-full bg-[#050811] border border-slate-800 rounded-2xl p-3 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-rose-500 font-medium"></textarea>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button id="btn-cancel-sos" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-2xl font-bold text-xs transition">Cancelar</button>
+                <button id="btn-send-sos" class="flex-1 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white py-3 rounded-2xl font-black text-xs uppercase tracking-wider shadow-xl shadow-rose-600/30 transition">Enviar S.O.S</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CREAR NOVEDAD -->
+    <div id="modal-report" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 hidden">
+        <div class="bg-[#0b101d] border border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            
+            <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-[#0b101d]">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 bg-orange-500/10 border border-orange-500/20 text-orange-500 rounded-2xl">
+                        <i class="fa-solid fa-bullhorn text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-sm text-slate-100">Publicar Comentario o Novedad</h3>
+                        <p class="text-[11px] text-slate-400">Comparte el estado de la vía en Cali</p>
+                    </div>
+                </div>
+                <button id="btn-close-modal" class="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800/50"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="form-report" class="p-5 overflow-y-auto space-y-4 text-xs">
+                <div>
+                    <label class="block font-bold text-slate-300 mb-2">1. Categoría de la Novedad</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5" id="category-selector">
+                        <button type="button" data-cat-id="trafico" class="cat-btn border-2 border-orange-500/40 bg-orange-500/10 text-orange-300 p-3 rounded-2xl text-left flex flex-col gap-1 transition shadow">
+                            <i class="fa-solid fa-shield-halved text-base"></i>
+                            <span class="font-bold text-[11px]">Tráfico / Control</span>
+                        </button>
+                        <button type="button" data-cat-id="accidente" class="cat-btn border border-slate-800 bg-[#050811] hover:bg-slate-800 text-rose-400 p-3 rounded-2xl text-left flex flex-col gap-1 transition">
+                            <i class="fa-solid fa-car-burst text-base"></i>
+                            <span class="font-bold text-[11px]">Accidente</span>
+                        </button>
+                        <button type="button" data-cat-id="obras" class="cat-btn border border-slate-800 bg-[#050811] hover:bg-slate-800 text-amber-400 p-3 rounded-2xl text-left flex flex-col gap-1 transition">
+                            <i class="fa-solid fa-person-digging text-base"></i>
+                            <span class="font-bold text-[11px]">Vía Cerrada</span>
+                        </button>
+                        <button type="button" data-cat-id="seguridad" class="cat-btn border border-slate-800 bg-[#050811] hover:bg-slate-800 text-purple-400 p-3 rounded-2xl text-left flex flex-col gap-1 transition">
+                            <i class="fa-solid fa-hand-fist text-base"></i>
+                            <span class="font-bold text-[11px]">Riesgo</span>
+                        </button>
+                        <button type="button" data-cat-id="clima" class="cat-btn border border-slate-800 bg-[#050811] hover:bg-slate-800 text-sky-400 p-3 rounded-2xl text-left flex flex-col gap-1 transition">
+                            <i class="fa-solid fa-cloud-showers-heavy text-base"></i>
+                            <span class="font-bold text-[11px]">Clima / Lluvia</span>
+                        </button>
+                        <button type="button" data-cat-id="general" class="cat-btn border border-slate-800 bg-[#050811] hover:bg-slate-800 text-emerald-400 p-3 rounded-2xl text-left flex flex-col gap-1 transition">
+                            <i class="fa-solid fa-bullhorn text-base"></i>
+                            <span class="font-bold text-[11px]">Aviso General</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">2. Dirección / Lugar de referencia</label>
+                    <div class="flex items-center gap-2 bg-[#050811] p-3 border border-slate-800 rounded-2xl shadow-inner">
+                        <i class="fa-solid fa-location-dot text-orange-500"></i>
+                        <input type="text" id="report-location-text" readonly class="bg-transparent text-slate-300 w-full outline-none text-xs font-medium" value="Haz clic en el mapa o usa la búsqueda">
+                    </div>
+                    <input type="hidden" id="report-lat">
+                    <input type="hidden" id="report-lng">
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">3. Detalle del comentario <span class="text-orange-500">*</span></label>
+                    <textarea id="report-description" rows="3" required placeholder="Describe lo que sucede en la vía..." class="w-full bg-[#050811] border border-slate-800 rounded-2xl p-3.5 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-orange-500 transition text-xs font-medium shadow-inner"></textarea>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">4. Evidencia Visual (Opcional)</label>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <button type="button" id="btn-attach-preset-photo" class="p-3 bg-[#050811] border border-slate-800 hover:border-slate-700 rounded-2xl text-slate-300 flex items-center justify-center gap-2 font-semibold transition">
+                            <i class="fa-solid fa-camera text-orange-400"></i>
+                            <span>Simular Imagen</span>
+                        </button>
+                        <input type="text" id="report-image-url" placeholder="o pega URL de imagen..." class="bg-[#050811] border border-slate-800 rounded-2xl px-3 text-slate-200 text-xs focus:outline-none focus:border-orange-500 font-medium">
+                    </div>
+                    <div id="photo-preview-container" class="mt-2.5 hidden">
+                        <div class="relative inline-block rounded-2xl overflow-hidden border border-slate-700 shadow-md">
+                            <img id="photo-preview" class="h-24 w-auto object-cover" src="" alt="Vista previa">
+                            <button type="button" id="btn-remove-photo" class="absolute top-1.5 right-1.5 bg-rose-600 text-white rounded-full p-1.5 w-6 h-6 flex items-center justify-center text-xs shadow">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-3">
+                    <button type="submit" class="w-full bg-gradient-to-r from-orange-600 via-amber-600 to-orange-500 hover:from-orange-500 hover:to-amber-500 text-white font-black py-3.5 rounded-2xl shadow-xl shadow-orange-600/30 transition text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-orange-400/30">
+                        <i class="fa-solid fa-paper-plane"></i> Publicar Novedad
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script Principal -->
+    <script>
+        const CATEGORIES = {
+            trafico: { label: 'Tráfico / Control', color: '#f97316', bgClass: 'bg-orange-500/20 text-orange-400 border-orange-500/30', icon: 'fa-shield-halved' },
+            accidente: { label: 'Accidente', color: '#f43f5e', bgClass: 'bg-rose-500/20 text-rose-400 border-rose-500/30', icon: 'fa-car-burst' },
+            obras: { label: 'Vía Cerrada', color: '#eab308', bgClass: 'bg-amber-500/20 text-amber-400 border-amber-500/30', icon: 'fa-person-digging' },
+            seguridad: { label: 'Riesgo / S.O.S', color: '#a855f7', bgClass: 'bg-purple-500/20 text-purple-400 border-purple-500/30', icon: 'fa-triangle-exclamation' },
+            clima: { label: 'Clima / Lluvia', color: '#0284c7', bgClass: 'bg-sky-500/20 text-sky-400 border-sky-500/30', icon: 'fa-cloud-showers-heavy' },
+            general: { label: 'Aviso General', color: '#10b981', bgClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', icon: 'fa-bullhorn' }
+        };
+
+        const PRESET_PHOTOS = [
+            'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=500&auto=format&fit=crop&q=60',
+            'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=500&auto=format&fit=crop&q=60'
+        ];
+
+        const CALI_CENTER = [3.4516, -76.5320];
+
+        const MIO_ROUTES = [
+            [[3.4790, -76.5180], [3.4520, -76.5310], [3.4350, -76.5380], [3.4000, -76.5450], [3.3710, -76.5320]],
+            [[3.4850, -76.5010], [3.4680, -76.5150], [3.4520, -76.5310]],
+            [[3.4350, -76.5380], [3.4150, -76.5050], [3.3980, -76.4850]]
+        ];
+
+        const CICLOVIAS = [
+            [[3.4500, -76.5320], [3.4250, -76.5400], [3.3850, -76.5380]],
+            [[3.4300, -76.5420], [3.4100, -76.5350], [3.3780, -76.5280]],
+            [[3.4620, -76.5280], [3.4500, -76.5350], [3.4420, -76.5450]]
+        ];
+
+        const PUNTOS_AMIGOS = [
+            { lat: 3.4280, lng: -76.5410, name: 'Estación Terpel Calle 5ta', type: 'Hidratación & Carga gratis' },
+            { lat: 3.4530, lng: -76.5320, name: 'Taller MotoTech Granada', type: 'Descuento 15% en despinche' },
+            { lat: 3.3790, lng: -76.5310, name: 'Punto Domiciliarios Univalle', type: 'Zona segura & Baño' }
+        ];
+
+        const INITIAL_DEMO_REPORTS = [
+            {
+                id: 'rep-demo-1',
+                category: 'trafico',
+                lat: 3.4242,
+                lng: -76.5418,
+                locationText: 'Calle 5ta frente a Tequendama',
+                description: 'Tráfico lento por retén de agentes de tránsito en sentido Sur-Norte.',
+                imageUrl: PRESET_PHOTOS[0],
+                timestamp: Date.now() - (15 * 60 * 1000),
+                author: 'Carlos - Moto 04',
+                comments: [{ author: 'Andrés - Moto 12', text: 'Confirmado, siguen pidiendo papeles.' }]
+            },
+            {
+                id: 'rep-demo-2',
+                category: 'obras',
+                lat: 3.4542,
+                lng: -76.5348,
+                locationText: 'Av. 6 Norte con Calle 18 (Granada)',
+                description: 'Vía cerrada por reparación de alcantarillado. Desvío por la Av. 4 Norte.',
+                imageUrl: '',
+                timestamp: Date.now() - (30 * 60 * 1000),
+                author: 'Felipe - Rappi',
+                comments: []
+            }
+        ];
+
+        let map;
+        let markersGroup;
+        let mioLayerGroup;
+        let cicloLayerGroup;
+        let puntosLayerGroup;
+        let routeLayerGroup;
+        let heatLayer;
+
+        let userGpsMarker = null;
+        let userLocation = null;
+        let totalEarnings = 0;
+        let deliveriesCount = 0;
+
+        let reports = [];
+        let currentFilter = 'all';
+        let currentSearchQuery = '';
+        let selectedCategory = 'trafico';
+        let currentUser = 'Carlos - Moto 04';
+
+        window.onload = function() {
+            initMap();
+            loadStorageReports();
+            setupEventListeners();
+            startProximityWatcher();
+            updatePicoPlacaCali();
+        };
+
+        function initMap() {
+            map = L.map('map', { zoomControl: false }).setView(CALI_CENTER, 14);
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri',
+                maxZoom: 19
+            }).addTo(map);
+
+            markersGroup = L.layerGroup().addTo(map);
+            mioLayerGroup = L.layerGroup().addTo(map);
+            cicloLayerGroup = L.layerGroup().addTo(map);
+            puntosLayerGroup = L.layerGroup().addTo(map);
+            routeLayerGroup = L.layerGroup().addTo(map);
+
+            MIO_ROUTES.forEach(route => {
+                L.polyline(route, { color: '#2563eb', weight: 5, opacity: 0.8, dashArray: '8, 6' })
+                    .bindPopup('<b class="text-blue-400">Troncal del MIO</b>')
+                    .addTo(mioLayerGroup);
+            });
+
+            CICLOVIAS.forEach(route => {
+                L.polyline(route, { color: '#10b981', weight: 4, opacity: 0.9 })
+                    .bindPopup('<b class="text-emerald-400">Ciclovía / Ciclorruta</b>')
+                    .addTo(cicloLayerGroup);
+            });
+
+            PUNTOS_AMIGOS.forEach(pt => {
+                L.marker([pt.lat, pt.lng], {
+                    icon: L.divIcon({
+                        className: 'custom-puntos-marker',
+                        html: `<div class="bg-emerald-600 text-white rounded-full p-2.5 border-2 border-white shadow-xl"><i class="fa-solid fa-store text-xs"></i></div>`,
+                        iconSize: [32, 32]
+                    })
+                }).bindPopup(`<b class="text-emerald-400">${pt.name}</b><br><span class="text-xs text-slate-300">${pt.type}</span>`).addTo(puntosLayerGroup);
+            });
+
+            map.on('click', function(e) {
+                const { lat, lng } = e.latlng;
+                setFormLocation(lat, lng, `Punto en Cali: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+                openReportModal();
+            });
+        }
+
+        function updatePicoPlacaCali() {
+            const day = new Date().getDay();
+            let digitsText = "Sin restricción (Fin de semana)";
+            if (day === 1) digitsText = "Placas terminadas en 7 y 8";
+            else if (day === 2) digitsText = "Placas terminadas en 9 y 0";
+            else if (day === 3) digitsText = "Placas terminadas en 1 y 2";
+            else if (day === 4) digitsText = "Placas terminadas en 3 y 4";
+            else if (day === 5) digitsText = "Placas terminadas en 5 y 6";
+            document.getElementById('pico-placa-digits').innerText = digitsText;
+        }
+
+        function loadStorageReports() {
+            const stored = localStorage.getItem('cali_gps_reports');
+            if (stored) {
+                try { reports = JSON.parse(stored); } catch (e) { reports = [...INITIAL_DEMO_REPORTS]; }
+            } else {
+                reports = [...INITIAL_DEMO_REPORTS];
+                saveStorageReports();
+            }
+            renderAll();
+        }
+
+        function saveStorageReports() {
+            localStorage.setItem('cali_gps_reports', JSON.stringify(reports));
+        }
+
+        function renderAll() {
+            const filtered = reports.filter(rep => {
+                const matchesCat = currentFilter === 'all' || rep.category === currentFilter;
+                const searchLower = currentSearchQuery.toLowerCase();
+                return matchesCat && (!currentSearchQuery || rep.description.toLowerCase().includes(searchLower) || rep.locationText.toLowerCase().includes(searchLower));
+            });
+
+            document.getElementById('active-count').innerText = filtered.length;
+            renderMapMarkers(filtered);
+            renderFeedList(filtered);
+            updateHeatmapData();
+        }
+
+        function renderMapMarkers(items) {
+            markersGroup.clearLayers();
+            items.forEach(rep => {
+                const catInfo = CATEGORIES[rep.category] || CATEGORIES.general;
+                const customIcon = L.divIcon({
+                    className: 'custom-leaflet-marker',
+                    html: `
+                        <div class="pulse-marker">
+                            <div class="marker-icon-wrapper" style="background-color: ${catInfo.color};">
+                                <i class="fa-solid ${catInfo.icon}"></i>
+                            </div>
+                        </div>
+                    `,
+                    iconSize: [42, 42],
+                    iconAnchor: [21, 21]
+                });
+                const marker = L.marker([rep.lat, rep.lng], { icon: customIcon });
+                const popupContent = `
+                    <div class="space-y-2 text-xs">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2 gap-2">
+                            <span class="px-2.5 py-1 rounded-lg font-bold text-[10px] uppercase shadow-sm" style="background: ${catInfo.color}33; color: ${catInfo.color};">
+                                <i class="fa-solid ${catInfo.icon} mr-1"></i>${catInfo.label}
+                            </span>
+                            <span class="text-[10px] text-slate-400">${formatTimeAgo(rep.timestamp)}</span>
+                        </div>
+                        <p class="font-bold text-orange-400"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(rep.locationText)}</p>
+                        <p class="font-medium text-slate-200">${escapeHtml(rep.description)}</p>
+                    </div>
+                `;
+                marker.bindPopup(popupContent);
+                markersGroup.addLayer(marker);
+            });
+        }
+
+        function renderFeedList(items) {
+            const feedContainer = document.getElementById('reports-feed');
+            if (items.length === 0) {
+                feedContainer.innerHTML = `<div class="text-center py-12 text-slate-500 text-xs font-medium">No hay novedades registradas.</div>`;
+                return;
+            }
+
+            feedContainer.innerHTML = items.map(rep => {
+                const catInfo = CATEGORIES[rep.category] || CATEGORIES.general;
+                const commentsList = rep.comments || [];
+
+                return `
+                    <div class="bg-[#050811] border border-slate-800/80 rounded-2xl p-4 space-y-3 transition shadow hover:border-slate-700">
+                        <div class="flex items-start justify-between gap-2">
+                            <span class="px-2.5 py-1 rounded-xl text-[10px] font-extrabold uppercase border flex items-center gap-1.5 shadow-sm ${catInfo.bgClass}">
+                                <i class="fa-solid ${catInfo.icon}"></i> ${catInfo.label}
+                            </span>
+                            <span class="text-[10px] text-slate-400 font-medium">${formatTimeAgo(rep.timestamp)}</span>
+                        </div>
+
+                        <div>
+                            <div class="text-[11px] font-bold text-slate-300 flex items-center gap-2 mb-1">
+                                <i class="fa-solid fa-circle-user text-orange-400 text-sm"></i> ${escapeHtml(rep.author)}
+                            </div>
+                            <div class="text-[11px] font-semibold text-orange-400 flex items-center gap-1.5 mb-1.5">
+                                <i class="fa-solid fa-location-dot"></i> ${escapeHtml(rep.locationText)}
+                            </div>
+                            <p class="text-xs text-slate-200 leading-relaxed font-normal">${escapeHtml(rep.description)}</p>
+                        </div>
+
+                        ${commentsList.length > 0 ? `
+                            <div class="bg-[#0b101d] rounded-xl p-2.5 space-y-1.5 border border-slate-800/80 text-[11px]">
+                                ${commentsList.map(c => `
+                                    <div class="border-b border-slate-800/60 pb-1 last:border-0 last:pb-0">
+                                        <span class="font-bold text-slate-300">${escapeHtml(c.author)}:</span>
+                                        <span class="text-slate-400">${escapeHtml(c.text)}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+
+                        <div class="flex items-center justify-between pt-2.5 border-t border-slate-800/80 text-xs">
+                            <button onclick="addComment('${rep.id}')" class="text-slate-400 hover:text-slate-200 text-[11px] flex items-center gap-1.5 transition font-semibold">
+                                <i class="fa-regular fa-comment-dots text-orange-400"></i> Responder
+                            </button>
+                            <button onclick="focusOnMap(${rep.lat}, ${rep.lng})" class="text-orange-400 hover:text-orange-300 font-bold text-[11px] flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-crosshairs"></i> Ver en mapa
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateHeatmapData() {
+            const heatPoints = reports.map(r => [r.lat, r.lng, 0.8]);
+            if (heatLayer) {
+                heatLayer.setLatLngs(heatPoints);
+            } else {
+                heatLayer = L.heatLayer(heatPoints, { radius: 25, blur: 15, maxZoom: 17 });
+            }
+        }
+
+        async function calculateRouteAndFare(destLat, destLng) {
+            const startCoords = userLocation ? [userLocation.lat, userLocation.lng] : CALI_CENTER;
+            try {
+                const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${startCoords[1]},${startCoords[0]};${destLng},${destLat}?overview=full&geometries=geojson`);
+                const data = await res.json();
+                if (!data.routes || data.routes.length === 0) return;
+
+                const route = data.routes[0];
+                const distanceKm = (route.distance / 1000).toFixed(1);
+                const durationMin = Math.round(route.duration / 60);
+                const calculatedFare = Math.max(4000, Math.round(4000 + (distanceKm * 1200)));
+
+                routeLayerGroup.clearLayers();
+                L.geoJSON(route.geometry, {
+                    style: { color: '#06b6d4', weight: 6, opacity: 0.9 }
+                }).addTo(routeLayerGroup);
+
+                L.marker([destLat, destLng], {
+                    icon: L.divIcon({
+                        className: 'custom-dest-marker',
+                        html: `<div class="bg-orange-600 text-white rounded-full p-3 border-2 border-white shadow-2xl"><i class="fa-solid fa-flag-checkered text-sm"></i></div>`,
+                        iconSize: [36, 36]
+                    })
+                }).addTo(routeLayerGroup);
+
+                document.getElementById('route-dist-val').innerText = `${distanceKm} km`;
+                document.getElementById('route-time-val').innerText = `${durationMin} min`;
+                document.getElementById('route-fare-val').innerText = `$ ${calculatedFare.toLocaleString('es-CO')} COP`;
+                document.getElementById('route-fare-panel').classList.remove('hidden');
+            } catch (err) { console.error(err); }
+        }
+
+        function startProximityWatcher() {
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition((pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    userLocation = { lat, lng };
+
+                    if (!userGpsMarker) {
+                        userGpsMarker = L.marker([lat, lng], {
+                            icon: L.divIcon({
+                                className: 'custom-user-gps',
+                                html: `<div class="w-6 h-6 bg-sky-500 border-2 border-white rounded-full shadow-xl animate-ping"></div>`,
+                                iconSize: [24, 24]
+                            })
+                        }).addTo(map);
+                    } else {
+                        userGpsMarker.setLatLng([lat, lng]);
+                    }
+
+                    const nearby = reports.find(r => getDistanceInMeters(lat, lng, r.lat, r.lng) <= 300);
+                    const alertBanner = document.getElementById('proximity-alert-banner');
+                    if (nearby) {
+                        document.getElementById('proximity-alert-text').innerText = `Atención: "${nearby.description}" a menos de 300m`;
+                        alertBanner.classList.remove('hidden');
+                        playAlertSound();
+                    } else {
+                        alertBanner.classList.add('hidden');
+                    }
+                }, () => {}, { enableHighAccuracy: true });
+            }
+        }
+
+        function playAlertSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                osc.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.15);
+            } catch(e) {}
+        }
+
+        async function searchAddress(query) {
+            if (!query) return;
+            const dropdown = document.getElementById('search-results-dropdown');
+            dropdown.innerHTML = '<div class="p-3 text-slate-400 flex items-center gap-2"><i class="fa-solid fa-spinner animate-spin text-orange-400"></i> Buscando en Cali...</div>';
+            dropdown.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Cali, Colombia')}`);
+                const results = await response.json();
+                if (results.length === 0) {
+                    dropdown.innerHTML = '<div class="p-3 text-slate-500">No se encontraron resultados.</div>';
+                    return;
+                }
+                dropdown.innerHTML = results.map(res => `
+                    <div onclick="selectSearchResult(${res.lat}, ${res.lon}, '${escapeHtml(res.display_name.split(',')[0])}')" class="p-3 hover:bg-slate-800 cursor-pointer text-slate-200 border-b border-slate-800/50 last:border-0 flex items-center gap-2.5 transition">
+                        <i class="fa-solid fa-location-dot text-orange-400"></i>
+                        <span class="truncate">${escapeHtml(res.display_name)}</span>
+                    </div>
+                `).join('');
+            } catch (err) {
+                dropdown.innerHTML = '<div class="p-3 text-rose-400">Error en la búsqueda.</div>';
+            }
+        }
+
+        window.selectSearchResult = function(lat, lng, name) {
+            document.getElementById('search-results-dropdown').classList.add('hidden');
+            document.getElementById('address-search-input').value = name;
+            map.flyTo([lat, lng], 16);
+            setFormLocation(lat, lng, name);
+            calculateRouteAndFare(lat, lng);
+        };
+
+        window.addComment = function(reportId) {
+            const rep = reports.find(r => r.id === reportId);
+            if (!rep) return;
+            const text = prompt('Escribe tu respuesta sobre esta novedad:');
+            if (text && text.trim()) {
+                if (!rep.comments) rep.comments = [];
+                rep.comments.push({ author: currentUser, text: text.trim() });
+                saveStorageReports();
+                renderAll();
+            }
+        };
+
+        window.focusOnMap = function(lat, lng) {
+            map.flyTo([lat, lng], 16, { animate: true, duration: 1 });
+        };
+
+        function setFormLocation(lat, lng, labelText) {
+            document.getElementById('report-lat').value = lat;
+            document.getElementById('report-lng').value = lng;
+            document.getElementById('report-location-text').value = labelText;
+        }
+
+        function openReportModal() {
+            if (!document.getElementById('report-lat').value) {
+                setFormLocation(CALI_CENTER[0], CALI_CENTER[1], 'Cali (Ubicación general)');
+            }
+            document.getElementById('modal-report').classList.remove('hidden');
+        }
+
+        function closeReportModal() {
+            document.getElementById('modal-report').classList.add('hidden');
+            document.getElementById('form-report').reset();
+            document.getElementById('photo-preview-container').classList.add('hidden');
+        }
+
+        function setupEventListeners() {
+            document.getElementById('btn-open-report-modal').addEventListener('click', openReportModal);
+            document.getElementById('btn-close-modal').addEventListener('click', closeReportModal);
+            document.getElementById('btn-close-fare-panel').addEventListener('click', () => {
+                document.getElementById('route-fare-panel').classList.add('hidden');
+                routeLayerGroup.clearLayers();
+            });
+
+            document.getElementById('btn-toggle-night-mode').addEventListener('click', () => {
+                document.getElementById('map').classList.toggle('night-mode-map');
+            });
+
+            document.getElementById('btn-earnings-trigger').addEventListener('click', () => {
+                document.getElementById('modal-earnings').classList.remove('hidden');
+            });
+            document.getElementById('btn-close-earnings').addEventListener('click', () => {
+                document.getElementById('modal-earnings').classList.add('hidden');
+            });
+
+            document.getElementById('form-add-delivery').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const fare = parseFloat(document.getElementById('input-delivery-fare').value) || 0;
+                const tip = parseFloat(document.getElementById('input-delivery-tip').value) || 0;
+                const sum = fare + tip;
+                totalEarnings += sum;
+                deliveriesCount++;
+                document.getElementById('header-earnings-val').innerText = `$ ${totalEarnings.toLocaleString('es-CO')} COP`;
+                document.getElementById('total-earnings-display').innerText = `$ ${totalEarnings.toLocaleString('es-CO')} COP`;
+                document.getElementById('total-deliveries-count').innerText = deliveriesCount;
+                document.getElementById('form-add-delivery').reset();
+            });
+
+            document.getElementById('btn-contacts-trigger').addEventListener('click', () => {
+                document.getElementById('modal-contacts').classList.remove('hidden');
+            });
+            document.getElementById('btn-close-contacts').addEventListener('click', () => {
+                document.getElementById('modal-contacts').classList.add('hidden');
+            });
+
+            document.getElementById('btn-sos-trigger').addEventListener('click', () => {
+                document.getElementById('modal-sos').classList.remove('hidden');
+            });
+            document.getElementById('btn-cancel-sos').addEventListener('click', () => {
+                document.getElementById('modal-sos').classList.add('hidden');
+            });
+            document.getElementById('btn-send-sos').addEventListener('click', () => {
+                const typeText = document.getElementById('sos-type').selectedOptions[0].text;
+                const descText = document.getElementById('sos-desc').value.trim();
+                const pos = userLocation || { lat: CALI_CENTER[0], lng: CALI_CENTER[1] };
+                const sosReport = {
+                    id: 'sos-' + Date.now(),
+                    category: 'seguridad',
+                    lat: pos.lat,
+                    lng: pos.lng,
+                    locationText: 'S.O.S - Posición GPS Actual',
+                    description: `🚨 ALERTA S.O.S (${typeText}): ${descText || 'Solicita asistencia inmediata de otros motorizados.'}`,
+                    timestamp: Date.now(),
+                    author: currentUser,
+                    comments: []
+                };
+                reports.unshift(sosReport);
+                saveStorageReports();
+                renderAll();
+                document.getElementById('modal-sos').classList.add('hidden');
+                map.flyTo([pos.lat, pos.lng], 16);
+            });
+
+            document.getElementById('layer-mio').addEventListener('change', (e) => {
+                if (e.target.checked) map.addLayer(mioLayerGroup);
+                else map.removeLayer(mioLayerGroup);
+            });
+
+            document.getElementById('layer-ciclo').addEventListener('change', (e) => {
+                if (e.target.checked) map.addLayer(cicloLayerGroup);
+                else map.removeLayer(cicloLayerGroup);
+            });
+
+            document.getElementById('layer-puntos').addEventListener('change', (e) => {
+                if (e.target.checked) map.addLayer(puntosLayerGroup);
+                else map.removeLayer(puntosLayerGroup);
+            });
+
+            document.getElementById('layer-heatmap').addEventListener('change', (e) => {
+                if (e.target.checked) map.addLayer(heatLayer);
+                else map.removeLayer(heatLayer);
+            });
+
+            document.getElementById('btn-address-search').addEventListener('click', () => {
+                searchAddress(document.getElementById('address-search-input').value.trim());
+            });
+
+            document.getElementById('address-search-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') searchAddress(e.target.value.trim());
+            });
+
+            const catBtns = document.querySelectorAll('.cat-btn');
+            catBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    catBtns.forEach(b => {
+                        b.classList.remove('border-2', 'border-orange-500/40', 'bg-orange-500/10');
+                        b.classList.add('border-slate-800', 'bg-[#050811]');
+                    });
+                    btn.classList.remove('border-slate-800', 'bg-[#050811]');
+                    btn.classList.add('border-2', 'border-orange-500/40', 'bg-orange-500/10');
+                    selectedCategory = btn.getAttribute('data-cat-id');
+                });
+            });
+
+            const filterBtns = document.querySelectorAll('.cat-filter');
+            filterBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    filterBtns.forEach(b => {
+                        b.classList.remove('bg-gradient-to-r', 'from-orange-600', 'to-amber-600', 'text-white', 'shadow-md');
+                        b.classList.add('bg-slate-800/80', 'text-slate-300');
+                    });
+                    btn.classList.remove('bg-slate-800/80', 'text-slate-300');
+                    btn.classList.add('bg-gradient-to-r', 'from-orange-600', 'to-amber-600', 'text-white', 'shadow-md');
+                    currentFilter = btn.getAttribute('data-cat');
+                    renderAll();
+                });
+            });
+
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                currentSearchQuery = e.target.value.trim();
+                renderAll();
+            });
+
+            document.getElementById('btn-my-location').addEventListener('click', () => {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition((pos) => {
+                        map.flyTo([pos.coords.latitude, pos.coords.longitude], 16);
+                    });
+                }
+            });
+
+            document.getElementById('btn-attach-preset-photo').addEventListener('click', () => {
+                const randomPhoto = PRESET_PHOTOS[Math.floor(Math.random() * PRESET_PHOTOS.length)];
+                document.getElementById('report-image-url').value = randomPhoto;
+                document.getElementById('photo-preview').src = randomPhoto;
+                document.getElementById('photo-preview-container').classList.remove('hidden');
+            });
+
+            document.getElementById('btn-remove-photo').addEventListener('click', () => {
+                document.getElementById('report-image-url').value = '';
+                document.getElementById('photo-preview-container').classList.add('hidden');
+            });
+
+            document.getElementById('form-report').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const lat = parseFloat(document.getElementById('report-lat').value) || CALI_CENTER[0];
+                const lng = parseFloat(document.getElementById('report-lng').value) || CALI_CENTER[1];
+                const locationText = document.getElementById('report-location-text').value;
+                const description = document.getElementById('report-description').value.trim();
+                const imageUrl = document.getElementById('report-image-url').value.trim();
+
+                if (!description) return;
+
+                const newReport = {
+                    id: 'rep-' + Date.now(),
+                    category: selectedCategory,
+                    lat,
+                    lng,
+                    locationText: locationText || 'Cali, Colombia',
+                    description,
+                    imageUrl,
+                    timestamp: Date.now(),
+                    author: currentUser,
+                    comments: []
+                };
+
+                reports.unshift(newReport);
+                saveStorageReports();
+                renderAll();
+                closeReportModal();
+                map.flyTo([lat, lng], 16);
+            });
+
+            document.getElementById('btn-demo-data').addEventListener('click', () => {
+                reports = [...INITIAL_DEMO_REPORTS];
+                saveStorageReports();
+                renderAll();
+            });
+
+            document.getElementById('btn-reset-data').addEventListener('click', () => {
+                reports = [];
+                saveStorageReports();
+                renderAll();
+            });
+        }
+
+        function getDistanceInMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180, Δλ = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+        }
+
+        function formatTimeAgo(timestamp) {
+            const minutes = Math.floor((Date.now() - timestamp) / 60000);
+            if (minutes < 1) return 'Hace un momento';
+            if (minutes < 60) return `Hace ${minutes} min`;
+            return `Hace ${Math.floor(minutes / 60)} h`;
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+        }
+    </script>
+</body>
+</html>
