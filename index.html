@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cali Delivery GPS - Plataforma de Logística Urbana</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script> tailwind.config = { darkMode: 'class', } </script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+    <style>
+        #map { width: 100%; height: 100%; z-index: 1; }
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background: #0f172a !important; color: #f8fafc !important;
+            border: 1px solid #1e293b; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7);
+            border-radius: 1rem;
+        }
+        .leaflet-popup-content { margin: 14px 18px; line-height: 1.5; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-track { background: #090d16; }
+        .dark ::-webkit-scrollbar-thumb { background: #1e293b; }
+        .marker-icon-wrapper {
+            width: 42px; height: 42px; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; border: 2.5px solid white;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.5); font-size: 16px; color: white;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-900 dark:bg-[#070a14] dark:text-slate-100 font-sans h-screen flex flex-col overflow-hidden select-none transition-colors duration-300">
+
+    <!-- CONTENEDOR DE NOTIFICACIONES TOAST -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-[2000] flex flex-col gap-2.5 pointer-events-none"></div>
+
+    <!-- HEADER SEMÁNTICO -->
+    <header class="bg-white dark:bg-[#0b101d] border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between z-20 shadow-xl shrink-0 flex-wrap gap-3">
+        <div class="flex items-center space-x-3.5">
+            <div class="w-14 h-14 rounded-2xl overflow-hidden shadow-xl shadow-orange-500/20 border-2 border-orange-500/50 bg-slate-950 flex items-center justify-center shrink-0 p-0.5">
+                <img src="logo.png" alt="Logotipo Cali Delivery GPS" class="w-full h-full object-contain">
+            </div>
+            <div>
+                <h1 class="font-black text-base md:text-lg leading-tight flex items-center gap-2 tracking-wide">
+                    CALI DELIVERY <span class="text-orange-500">GPS</span>
+                    <span class="text-[10px] bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 px-2 py-0.5 rounded-md font-mono font-bold shadow">PRO</span>
+                </h1>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Red Vial Colaborativa & Logística Urbana</p>
+            </div>
+        </div>
+
+        <!-- NAV DE ACCESOS RÁPIDOS -->
+        <nav class="flex items-center gap-2.5 flex-wrap" aria-label="Menú principal">
+            
+            <button id="btn-theme-toggle" class="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-3.5 py-2 rounded-2xl text-xs flex items-center gap-2 transition hover:scale-105 shadow-md">
+                <i class="fa-solid fa-moon dark:text-amber-400 text-slate-700 text-xs" id="theme-icon"></i>
+                <span class="font-semibold hidden sm:inline" id="theme-text">Modo Claro</span>
+            </button>
+
+            <button id="btn-earnings-trigger" class="bg-gradient-to-r from-emerald-600 to-teal-700 text-white px-4 py-2 rounded-2xl font-bold text-xs flex items-center gap-2 transition shadow-lg hover:scale-105">
+                <div class="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center text-white"><i class="fa-solid fa-wallet text-xs"></i></div>
+                <div class="text-left leading-tight">
+                    <span class="block text-[9px] text-emerald-200 uppercase">Ganancias</span>
+                    <span id="header-earnings-val" class="font-extrabold text-xs">$ 0 COP</span>
+                </div>
+            </button>
+
+            <!-- Botón de Emergencia Integral (Nuevo) -->
+            <button id="btn-emergency-trigger" class="bg-gradient-to-r from-rose-600 to-red-700 text-white font-black px-4 py-2 rounded-2xl shadow-lg flex items-center gap-2 text-xs transition animate-pulse hover:scale-105">
+                <div class="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center text-white"><i class="fa-solid fa-phone-volume text-xs"></i></div>
+                <span>EMERGENCIAS S.O.S</span>
+            </button>
+        </nav>
+    </header>
+
+    <!-- MAIN SEMÁNTICO -->
+    <main class="flex-1 flex flex-col md:flex-row relative overflow-hidden">
+
+        <!-- SECTION LATERAL CON PESTAÑAS AVANZADAS -->
+        <section class="w-full md:w-[420px] bg-white dark:bg-[#0b101d] border-r border-slate-200 dark:border-slate-800 flex flex-col z-10 shrink-0 h-1/2 md:h-full shadow-2xl">
+            
+            <!-- Pestañas de Navegación Lateral -->
+            <div class="grid grid-cols-3 bg-slate-100 dark:bg-[#050811] p-1.5 border-b border-slate-200 dark:border-slate-800 text-[11px] font-bold text-center gap-1">
+                <button id="tab-novedades" class="py-2 rounded-xl bg-orange-600 text-white transition shadow">📢 Novedades</button>
+                <button id="tab-radar" class="py-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-white transition">🛵 Radar</button>
+                <button id="tab-herramientas" class="py-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-white transition">🛠️ Utilidades</button>
+            </div>
+
+            <!-- CONTENEDOR 1: NOVEDADES -->
+            <div id="section-novedades-content" class="flex-1 flex flex-col overflow-hidden">
+                <div class="p-4 border-b border-slate-200 dark:border-slate-800 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h2 class="font-extrabold text-xs text-slate-700 dark:text-slate-200 uppercase tracking-wider">Reportes ( <span id="active-count" class="text-orange-500 font-mono">0</span> )</h2>
+                        <button id="btn-open-report-modal" class="bg-orange-600 hover:bg-orange-500 text-white font-extrabold px-3 py-1.5 rounded-xl text-xs transition shadow"><i class="fa-solid fa-plus"></i> Publicar</button>
+                    </div>
+                </div>
+                <div id="reports-feed" class="flex-1 overflow-y-auto p-3 space-y-3"></div>
+            </div>
+
+            <!-- CONTENEDOR 2: RADAR DE PEDIDOS Y COLEGAS -->
+            <div id="section-radar-content" class="flex-1 flex flex-col overflow-hidden hidden p-4 space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+                    <h3 class="font-extrabold text-xs text-slate-700 dark:text-slate-200 uppercase"><i class="fa-solid fa-radar text-emerald-500 animate-spin"></i> Radar de Entregas</h3>
+                    <span class="text-[10px] bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded font-bold">Activo</span>
+                </div>
+                <div id="radar-feed" class="flex-1 overflow-y-auto space-y-3">
+                    <div class="bg-slate-50 dark:bg-[#050811] border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 space-y-2">
+                        <div class="flex justify-between items-center"><span class="font-bold text-xs">🍔 El Corral (Granada)</span><span class="text-emerald-500 font-black text-xs">$ 8.500</span></div>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Entrega en Centenario (2.4 km)</p>
+                        <button onclick="aceptarPedido('El Corral', '$ 8.500')" class="w-full bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs">Aceptar Pedido</button>
+                    </div>
+                    <div class="bg-slate-50 dark:bg-[#050811] border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 space-y-2">
+                        <div class="flex justify-between items-center"><span class="font-bold text-xs">🍕 Cali Pez (San Fernando)</span><span class="text-emerald-500 font-black text-xs">$ 7.000</span></div>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Entrega en Imbanaco (1.8 km)</p>
+                        <button onclick="aceptarPedido('Cali Pez', '$ 7.000')" class="w-full bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs">Aceptar Pedido</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTENEDOR 3: UTILIDADES (Gasolina y Rutas Favoritas) -->
+            <div id="section-herramientas-content" class="flex-1 flex flex-col overflow-hidden hidden p-4 space-y-4">
+                <!-- Calculadora de Gasolina -->
+                <div class="bg-slate-50 dark:bg-[#050811] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3">
+                    <h3 class="font-bold text-xs text-orange-500 uppercase flex items-center gap-2"><i class="fa-solid fa-gas-pump"></i> Calculadora de Gasolina</h3>
+                    <div class="space-y-2 text-xs">
+                        <input type="number" id="calc-km" placeholder="Km recorridos hoy..." class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5">
+                        <button onclick="calcularGasolina()" class="w-full bg-orange-600 text-white font-bold py-2 rounded-xl">Estimar Gasto</button>
+                        <p id="calc-result" class="font-bold text-emerald-500 text-center"></p>
+                    </div>
+                </div>
+
+                <!-- Rutas Favoritas -->
+                <div class="bg-slate-50 dark:bg-[#050811] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3">
+                    <h3 class="font-bold text-xs text-orange-500 uppercase flex items-center gap-2"><i class="fa-solid fa-bookmark"></i> Destinos Favoritos</h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="input-ruta-fav" placeholder="Ej. Base Principal San Fernando" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2 text-xs">
+                        <button onclick="guardarRutaFav()" class="bg-slate-800 text-white px-3 py-2 rounded-xl text-xs"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                    <div id="rutas-fav-list" class="space-y-1.5 text-xs max-h-28 overflow-y-auto"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION MAPA -->
+        <section class="flex-1 relative h-1/2 md:h-full">
+            <div id="map"></div>
+        </section>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-white dark:bg-[#0b101d] border-t border-slate-200 dark:border-slate-800 px-4 py-2 text-center text-[11px] text-slate-500 dark:text-slate-400 shrink-0 flex items-center justify-between flex-wrap gap-2">
+        <p>&copy; 2026 Cali Delivery GPS. Desarrollado por Juan José Torres.</p>
+        <span class="text-emerald-500 font-semibold"><i class="fa-solid fa-circle-check"></i> Sistema Operativo Web</span>
+    </footer>
+
+    <!-- MODAL: CENTRO DE EMERGENCIAS S.O.S (Nuevo y Completo) -->
+    <div id="modal-emergency" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-[#0b101d] border-2 border-rose-600 rounded-3xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <div class="flex items-center gap-3">
+                    <div class="p-3 bg-rose-600 text-white rounded-2xl"><i class="fa-solid fa-phone-volume text-xl"></i></div>
+                    <div><h3 class="font-black text-sm text-rose-500">CENTRO DE EMERGENCIAS</h3><p class="text-[11px] text-slate-400">Llamada directa desde Cali</p></div>
+                </div>
+                <button id="btn-close-emergency" class="text-slate-400 p-2 rounded-xl bg-slate-100 dark:bg-slate-800"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div class="space-y-2.5 text-xs font-semibold">
+                <a href="tel:123" class="flex items-center justify-between bg-slate-50 dark:bg-[#050811] p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-rose-500 transition">
+                    <div class="flex items-center gap-3"><i class="fa-solid fa-shield-halved text-rose-500 text-base"></i><span>Policía Nacional / Cuadrante</span></div>
+                    <span class="bg-rose-600 text-white px-3 py-1 rounded-xl font-mono">123</span>
+                </a>
+                <a href="tel:127" class="flex items-center justify-between bg-slate-50 dark:bg-[#050811] p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-amber-500 transition">
+                    <div class="flex items-center gap-3"><i class="fa-solid fa-car-burst text-amber-500 text-base"></i><span>Tránsito de Cali (Movilidad)</span></div>
+                    <span class="bg-amber-600 text-white px-3 py-1 rounded-xl font-mono">127</span>
+                </a>
+                <a href="tel:119" class="flex items-center justify-between bg-slate-50 dark:bg-[#050811] p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-sky-500 transition">
+                    <div class="flex items-center gap-3"><i class="fa-solid fa-fire text-sky-500 text-base"></i><span>Bomberos Voluntarios Cali</span></div>
+                    <span class="bg-sky-600 text-white px-3 py-1 rounded-xl font-mono">119</span>
+                </a>
+                <a href="tel:132" class="flex items-center justify-between bg-slate-50 dark:bg-[#050811] p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500 transition">
+                    <div class="flex items-center gap-3"><i class="fa-solid fa-kit-medical text-emerald-500 text-base"></i><span>Cruz Roja / Ambulancias</span></div>
+                    <span class="bg-emerald-600 text-white px-3 py-1 rounded-xl font-mono">132</span>
+                </a>
+                <a href="tel:147" class="flex items-center justify-between bg-slate-50 dark:bg-[#050811] p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-indigo-500 transition">
+                    <div class="flex items-center gap-3"><i class="fa-solid fa-user-shield text-indigo-500 text-base"></i><span>Línea Militar / Ejército</span></div>
+                    <span class="bg-indigo-600 text-white px-3 py-1 rounded-xl font-mono">147</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: GANANCIAS -->
+    <div id="modal-earnings" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-[#0b101d] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
+                <h3 class="font-extrabold text-sm">Contabilidad de Domicilios</h3>
+                <button id="btn-close-earnings" class="text-slate-400 p-2 rounded-xl bg-slate-100 dark:bg-slate-800"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="grid grid-cols-2 gap-3 text-center">
+                <div class="bg-slate-100 dark:bg-[#050811] p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                    <span class="block text-[10px] text-slate-500 uppercase font-bold">Total Ganado</span>
+                    <span id="total-earnings-display" class="font-black text-emerald-500 text-xl mt-1 block">$ 0 COP</span>
+                </div>
+                <div class="bg-slate-100 dark:bg-[#050811] p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                    <span class="block text-[10px] text-slate-500 uppercase font-bold">Servicios</span>
+                    <span id="total-deliveries-count" class="font-black text-slate-800 dark:text-slate-200 text-xl mt-1 block">0</span>
+                </div>
+            </div>
+            <button id="btn-export-csv" class="w-full bg-slate-200 dark:bg-slate-800 font-bold py-3 rounded-2xl border border-slate-300 dark:border-slate-700 text-xs">Descargar Reporte Financiero (CSV)</button>
+        </div>
+    </div>
+
+    <!-- MODAL: CREAR NOVEDAD -->
+    <div id="modal-report" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-[#0b101d] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
+            <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <h3 class="font-extrabold text-sm">Publicar Novedad Vial</h3>
+                <button id="btn-close-modal" class="text-slate-400 p-2 rounded-xl bg-slate-100 dark:bg-slate-800"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-report" class="p-5 space-y-4 text-xs">
+                <textarea id="report-description" rows="3" required placeholder="Describe la novedad en la vía..." class="w-full bg-slate-100 dark:bg-[#050811] border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 focus:outline-none focus:border-orange-500"></textarea>
+                <input type="hidden" id="report-lat" value="3.4516">
+                <input type="hidden" id="report-lng" value="-76.5320">
+                <button type="submit" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-black py-3.5 rounded-2xl shadow-xl uppercase">Publicar Novedad</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- SCRIPT PRINCIPAL -->
+    <script>
+        const CALI_CENTER = [3.4516, -76.5320];
+        let map, markersGroup, colegasGroup;
+        let totalEarnings = 0, deliveriesCount = 0, deliveriesList = [];
+        let reports = [];
+
+        window.onload = function() {
+            initMap();
+            loadStorageReports();
+            setupEventListeners();
+            cargarRutasFav();
+        };
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgCol = type === 'success' ? 'bg-emerald-950 border-emerald-500 text-emerald-100' : 'bg-rose-950 border-rose-500 text-rose-100';
+            toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl border-2 shadow-2xl backdrop-blur-md text-xs font-bold transition-all duration-300 ${bgCol}`;
+            toast.innerHTML = `<i class="fa-solid fa-circle-check"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function initMap() {
+            map = L.map('map', { zoomControl: false }).setView(CALI_CENTER, 14);
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(map);
+            markersGroup = L.layerGroup().addTo(map);
+            colegasGroup = L.layerGroup().addTo(map);
+
+            // Simulación de colegas en la vía (P2P)
+            const colegas = [
+                { lat: 3.4420, lng: -76.5200, name: 'Carlos (Moto 04)' },
+                { lat: 3.4610, lng: -76.5400, name: 'Andrés (Moto 12)' }
+            ];
+            colegas.forEach(c => {
+                L.marker([c.lat, c.lng], {
+                    icon: L.divIcon({
+                        className: 'colega-marker',
+                        html: `<div class="bg-blue-600 text-white rounded-full p-2 border-2 border-white shadow-lg text-[10px]"><i class="fa-solid fa-motorcycle"></i></div>`,
+                        iconSize: [28, 28]
+                    })
+                }).bindPopup(`<b class="text-blue-400">${c.name}</b><br><span class="text-xs">Colega activo en la red</span>`).addTo(colegasGroup);
+            });
+
+            map.on('click', function(e) {
+                document.getElementById('report-lat').value = e.latlng.lat;
+                document.getElementById('report-lng').value = e.latlng.lng;
+                document.getElementById('modal-report').classList.remove('hidden');
+            });
+        }
+
+        function loadStorageReports() {
+            const stored = localStorage.getItem('cali_gps_reports');
+            reports = stored ? JSON.parse(stored) : [
+                { id: '1', lat: 3.4242, lng: -76.5418, locationText: 'Calle 5ta', description: 'Tráfico lento por control.' }
+            ];
+            renderAll();
+        }
+
+        function saveStorageReports() {
+            localStorage.setItem('cali_gps_reports', JSON.stringify(reports));
+        }
+
+        function renderAll() {
+            markersGroup.clearLayers();
+            reports.forEach(rep => {
+                const marker = L.marker([rep.lat, rep.lng], {
+                    icon: L.divIcon({
+                        className: 'custom-marker',
+                        html: `<div class="marker-icon-wrapper" style="background-color: #f97316;"><i class="fa-solid fa-shield-halved"></i></div>`,
+                        iconSize: [42, 42]
+                    })
+                });
+                marker.bindPopup(`<b class="text-orange-500">${rep.locationText}</b><br>${rep.description}`);
+                markersGroup.addLayer(marker);
+            });
+            document.getElementById('active-count').innerText = reports.length;
+            renderFeed();
+        }
+
+        function renderFeed() {
+            const feed = document.getElementById('reports-feed');
+            feed.innerHTML = reports.map(r => `
+                <div class="bg-slate-50 dark:bg-[#050811] border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 space-y-1.5 shadow-inner">
+                    <p class="text-xs font-bold text-orange-500"><i class="fa-solid fa-location-dot"></i> ${r.locationText}</p>
+                    <p class="text-xs text-slate-700 dark:text-slate-200">${r.description}</p>
+                </div>
+            `).join('');
+        }
+
+        window.calcularGasolina = function() {
+            const km = parseFloat(document.getElementById('calc-km').value) || 0;
+            const costoEstimado = km * 350; // Estimado promedio por km en Cali
+            document.getElementById('calc-result').innerText = `Gasto estimado: $ ${costoEstimado.toLocaleString('es-CO')} COP`;
+        };
+
+        window.guardarRutaFav = function() {
+            const val = document.getElementById('input-ruta-fav').value.trim();
+            if (!val) return;
+            let favs = JSON.parse(localStorage.getItem('cali_rutas_fav') || '[]');
+            favs.push(val);
+            localStorage.setItem('cali_rutas_fav', JSON.stringify(favs));
+            document.getElementById('input-ruta-fav').value = '';
+            cargarRutasFav();
+            showToast("Ruta favorita guardada", "success");
+        };
+
+        function cargarRutasFav() {
+            let favs = JSON.parse(localStorage.getItem('cali_rutas_fav') || '[]');
+            const list = document.getElementById('rutas-fav-list');
+            list.innerHTML = favs.map(f => `<div class="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 font-medium"><i class="fa-solid fa-map-pin text-orange-500 mr-2"></i>${f}</div>`).join('') || '<span class="text-slate-400">Sin rutas guardadas.</span>';
+        }
+
+        window.aceptarPedido = function(restaurante, valor) {
+            const valNum = parseInt(valor.replace(/[^0-9]/g, ''));
+            totalEarnings += valNum;
+            deliveriesCount++;
+            deliveriesList.push({ fare: valNum, total: valNum });
+            document.getElementById('header-earnings-val').innerText = `$ ${totalEarnings.toLocaleString('es-CO')} COP`;
+            document.getElementById('total-earnings-display').innerText = `$ ${totalEarnings.toLocaleString('es-CO')} COP`;
+            document.getElementById('total-deliveries-count').innerText = deliveriesCount;
+            showToast(`¡Pedido de ${restaurante} aceptado!`, 'success');
+        };
+
+        function setupEventListeners() {
+            document.getElementById('btn-open-report-modal').onclick = () => document.getElementById('modal-report').classList.remove('hidden');
+            document.getElementById('btn-close-modal').onclick = () => document.getElementById('modal-report').classList.add('hidden');
+            document.getElementById('btn-earnings-trigger').onclick = () => document.getElementById('modal-earnings').classList.remove('hidden');
+            document.getElementById('btn-close-earnings').onclick = () => document.getElementById('modal-earnings').classList.add('hidden');
+            
+            // Emergencias
+            document.getElementById('btn-emergency-trigger').onclick = () => document.getElementById('modal-emergency').classList.remove('hidden');
+            document.getElementById('btn-close-emergency').onclick = () => document.getElementById('modal-emergency').classList.add('hidden');
+
+            // Cambio de Pestañas
+            document.getElementById('tab-novedades').onclick = (e) => {
+                e.target.className = "py-2 rounded-xl bg-orange-600 text-white transition shadow";
+                document.getElementById('tab-radar').className = document.getElementById('tab-herramientas').className = "py-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-white transition";
+                document.getElementById('section-novedades-content').classList.remove('hidden');
+                document.getElementById('section-radar-content').classList.add('hidden');
+                document.getElementById('section-herramientas-content').classList.add('hidden');
+            };
+            document.getElementById('tab-radar').onclick = (e) => {
+                e.target.className = "py-2 rounded-xl bg-orange-600 text-white transition shadow";
+                document.getElementById('tab-novedades').className = document.getElementById('tab-herramientas').className = "py-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-white transition";
+                document.getElementById('section-radar-content').classList.remove('hidden');
+                document.getElementById('section-novedades-content').classList.add('hidden');
+                document.getElementById('section-herramientas-content').classList.add('hidden');
+            };
+            document.getElementById('tab-herramientas').onclick = (e) => {
+                e.target.className = "py-2 rounded-xl bg-orange-600 text-white transition shadow";
+                document.getElementById('tab-novedades').className = document.getElementById('tab-radar').className = "py-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-white transition";
+                document.getElementById('section-herramientas-content').classList.remove('hidden');
+                document.getElementById('section-novedades-content').classList.add('hidden');
+                document.getElementById('section-radar-content').classList.add('hidden');
+            };
+
+            // Modo Oscuro / Claro
+            document.getElementById('btn-theme-toggle').onclick = () => {
+                const html = document.documentElement;
+                const isDark = html.classList.toggle('dark');
+                document.getElementById('theme-text').innerText = isDark ? "Modo Claro" : "Modo Oscuro";
+                document.getElementById('theme-icon').className = isDark ? "fa-solid fa-moon text-amber-400 text-xs" : "fa-solid fa-sun text-amber-500 text-xs";
+                showToast(isDark ? "Modo Oscuro activado" : "Modo Claro activado", "success");
+            };
+
+            // Exportar CSV
+            document.getElementById('btn-export-csv').onclick = () => {
+                let csvContent = "data:text/csv;charset=utf-8,Servicio,Valor\n";
+                deliveriesList.forEach((d, idx) => { csvContent += `${idx + 1},${d.fare}\n`; });
+                const link = document.createElement("a");
+                link.setAttribute("href", encodeURI(csvContent));
+                link.setAttribute("download", "reporte_ganancias.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showToast("Reporte descargado con éxito", "success");
+            };
+
+            document.getElementById('form-report').onsubmit = (e) => {
+                e.preventDefault();
+                reports.unshift({
+                    id: 'rep-' + Date.now(),
+                    lat: parseFloat(document.getElementById('report-lat').value) || CALI_CENTER[0],
+                    lng: parseFloat(document.getElementById('report-lng').value) || CALI_CENTER[1],
+                    locationText: 'Punto reportado en Cali',
+                    description: document.getElementById('report-description').value
+                });
+                saveStorageReports();
+                renderAll();
+                document.getElementById('modal-report').classList.add('hidden');
+                document.getElementById('form-report').reset();
+                showToast("¡Novedad publicada!", "success");
+            };
+        }
+    </script>
+</body>
+</html>
